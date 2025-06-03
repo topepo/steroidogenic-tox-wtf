@@ -1,0 +1,222 @@
+---
+title: "Model Results"
+author: "Max Kuhn"
+format: html
+editor: visual
+---
+
+```{r}
+#| label: startup
+#| include: false
+library(tidymodels)
+library(probably)
+library(bestNormalize)
+library(fs)
+library(cli)
+library(epoxy)
+library(gtsummary)
+library(xfun)
+library(naniar)
+library(gt)
+
+# library(cardx)
+# library(aorsf)
+
+# ------------------------------------------------------------------------------
+
+tidymodels_prefer()
+theme_set(theme_bw())
+options(pillar.advice = FALSE, pillar.min_title_chars = Inf)
+
+# ------------------------------------------------------------------------------
+
+load(path("rdata", "splits.RData"))
+load(path("rdata", "model.RData"))
+
+tox_all <- bind_rows(tox_train, tox_test) 
+has_missing <- map_lgl(tox_all, ~ any(is.na(.x)))
+```
+
+## Data Description
+
+The original data consisted of `r format_inline("{ncol(tox_all) - 1} assay{?s}")` on `r format_inline("{nrow(tox_all)} compound{?s}.")` Each compound was pre-labeled into one of `r numbers_to_words(length(levels(tox_train$Class)))` classes: `r format_inline("{.val {levels(tox_all$Class)}}")`. 
+
+The breakdown of the assays and their class distributions:
+
+```{r}
+#| label: data-summary
+#| echo: false
+
+tox_all |> 
+  tbl_summary(
+    include = c(-Class),
+    by = Class, 
+    missing = "ifany" 
+  ) |> 
+  add_n() |>
+  modify_header(label = "**Assay**") |> 
+  bold_labels()
+```
+
+Note that `r format_inline("{sum(has_missing)} assay{?s}")` contained missing values. The patterns of missingness can be shown via an "UpSet" plot:
+
+```{r}
+#| label: missing
+#| echo: false
+#| out-width: 90%
+#| fig-width: 6
+#| fig-height: 5
+#| fig-align: center
+
+gg_miss_upset(tox_all[, has_missing], nsets = 10)
+```
+
+These values will be imputed during the data analysis. 
+
+## Data Splitting
+
+An initial split where 80% of the compounds were allocated to the training set (n = `r nrow(tox_train)`) and 20% for testing  (n = `r nrow(tox_test)`). The class frequencies are relatively balanced, so an unstratified split was used. 
+
+To assess if the training and testing set has approximately the same distribution, we conducted a principal component analysis (PCA) to show how the assays project down to two dimensions. Before conducting PCA, we used a 5-nearest neighbor imputation strategy as well as an [Ordered Quantile](https://aml4td.org/chapters/numeric-predictors.html#sec-skewness) standardization routine to coerce the assays to a standard scale and also to remove skewness from their distributions. The PCA loadings were computed from the training set, and these values were used to project the training and testing sets. 
+
+
+```{r}
+#| label: pca
+#| echo: false
+#| out-width: 70%
+#| fig-width: 5
+#| fig-height: 5
+#| fig-align: center
+
+pca_rec <- recipe(Class ~ ., data = tox_train) |> 
+  step_impute_knn(all_numeric_predictors(), neighbors = 5) |> 
+  step_orderNorm(all_numeric_predictors()) |> 
+  step_pca(all_numeric_predictors(), num_comp = 2) |> 
+  prep()
+
+bind_rows(
+  bake(pca_rec, tox_train) |> mutate(data = "Training"),
+  bake(pca_rec, tox_test) |> mutate(data = "Testing")
+) |> 
+  ggplot(aes(PC1, PC2, col = data, pch = data)) + 
+  geom_point(cex = 2, alpha = 3 / 4) + 
+  coord_obs_pred() + 
+  theme(legend.position = "top")
+```
+
+The results show overlapping distributions and no apparent outliers. 
+
+Using the training set, `r numbers_to_words(attributes(tox_rs)$repeats)` repeats of `r attributes(tox_rs)$v`-fold cross-validation were created. These will be used to tune our machine learning model. 
+
+## Model Tuning
+
+```{r}
+#| label: tuning-info
+#| include: false
+
+rf_grid <- 
+  collect_metrics(rf_res) |> 
+  distinct(neighbors, mtry, min_n)
+
+rf_ranges <- map(rf_grid, ~ range(.x))
+
+rf_best <- select_best(rf_res, metric = "roc_auc")
+rf_best_metrics <- show_best(rf_res, metric = "roc_auc", n = 1)
+```
+
+An [oblique random forest model](https://scholar.google.com/scholar?hl=en&as_sdt=0%2C7&q=%22oblique+random+forests%22&btnG=) was used to classify the compounds as `r format_inline("{.or {.val {levels(tox_all$Class)}}}")`. There are a few tuning parameters to be optimized: 
+
+- The number of neighbors used for imputing missing data. Values between  `r format_inline("{rf_ranges[['neighbors']]}")` were investigated. 
+
+- The number of assays to use as split candidates, a.k.a $m_{try}$, was marked for optimization. Values from `r min(rf_ranges[['mtry']])` to `r max(rf_ranges[['mtry']])` were used as candidate values. 
+
+- The number of compunds required to make additional splits was also tuned between values of `r format_inline("{rf_ranges[['min_n']]}")` compounds.
+
+An [Audze-Eglais](https://scholar.google.com/scholar?hl=en&as_sdt=0%2C7&q=New+approach+to+planning+out+of+experiments&as_ylo=1977&as_yhi=1977&btnG=) space-filling design was used to create the grid of `r nrow(rf_grid)` parameter candidates. 
+
+For each candidate, the cross-validated area under the ROC curve was computed and these values are used to determine the final settings for the random forest model. The results are: 
+
+```{r}
+#| label: roc-tune
+#| echo: false
+#| out-width: 100%
+#| fig-width: 7
+#| fig-height: 3.5
+#| fig-align: center
+
+autoplot(rf_res, metric = "roc_auc") + 
+  labs(y = "ROC AUC (resampled)")
+```
+
+The left panel shows no trend, indicating that the data did not have a preference for how many neighbors should be used. There was a weak relationship between the AUC and $m_{try}$ and a very strong trend where the smaller the number of compounds required to split, the better the AUC. 
+
+The numerically best combination was: imputation using `r numbers_to_words(rf_best$neighbors)` neighbors, `r numbers_to_words(rf_best$mtry)` assays used for splitting, and `r numbers_to_words(rf_best$min_n)` compounds require for splitting. Resampling estimates that the area under the ROC should be about `r format(rf_best_metrics$mean, digits = 3)` with a 90% confidence interval of (`r format(rf_int$.lower, digits = 3)`, `r format(rf_int$.upper, digits = 3)`).
+
+The final random forest model was fit with these settings using the entire training set. The random forest importance scores for this model were:
+
+```{r}
+#| label: rf-imp
+#| echo: false
+#| warning: false
+#| out-width: 100%
+#| fig-width: 7
+#| fig-height: 3.5
+#| fig-align: center
+
+rf_final_res |> 
+  extract_fit_engine() |> 
+  aorsf::orsf_vi() |> 
+  enframe() |> 
+  mutate(
+    name = factor(name), 
+    name = reorder(name, value)
+  ) |> 
+  ggplot(aes(value, name)) + 
+  geom_bar(stat = "identity") +
+  labs(x = "Importance", y = NULL)
+```
+
+## Test Set Results
+
+When this model was applied to the test set, the confusion matrix was: 
+
+```{r}
+#| label: conf-mat
+#| echo: false
+
+final_auc <- 
+  rf_final_res |> 
+  collect_metrics() |> 
+  filter(.metric == "roc_auc") |> 
+  pluck(".estimate")
+
+rf_final_res |> 
+  collect_predictions() |> 
+  count(Class, .pred_class) |> 
+  pivot_wider(id_cols = .pred_class, names_from = c(Class), values_from = n) |> 
+  gt() |> 
+  tab_spanner(label = "True Values", columns = c(-.pred_class)) |> 
+  cols_label(c(.pred_class) ~ "Prediction")
+```
+
+The test set area under the ROC curve was `r format(final_auc, digits = 3)` with a 90% confidence interval of (`r format(rf_final_int$.lower, digits = 3)`, `r format(rf_final_int$.upper, digits = 3)`). The ROC curve:
+
+```{r}
+#| label: test-roc
+#| echo: false
+#| out-width: 55%
+#| fig-width: 4
+#| fig-height: 4
+#| fig-align: center
+rf_final_res |> 
+  collect_predictions() |> 
+  roc_curve(Class, .pred_toxic) |> 
+  arrange(specificity, sensitivity) |> 
+  ggplot(aes(1 - specificity, sensitivity)) + 
+  geom_abline(col = "red", lty = 2) +
+  geom_step(direction = "hv") + 
+  coord_obs_pred()
+```
+
+
+

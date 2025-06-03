@@ -72,6 +72,13 @@ rf_best_mean_pred |>
   coord_obs_pred()
 
 # ------------------------------------------------------------------------------
+# Percentile intervals on the ROC AUC
+
+set.seed(39)
+rf_int <- int_pctl(rf_res, parameters = rf_best, metric = metric_set(roc_auc), 
+                   alpha = 0.1, times = 2000)
+
+# ------------------------------------------------------------------------------
 # Fit to training, evaluate on testing
 
 rf_final_wflow <- 
@@ -83,7 +90,12 @@ rf_final_res <-
   rf_final_wflow |> 
   last_fit(tox_split)
 
+set.seed(664)
+rf_final_int <- int_pctl(rf_final_res, metric = metric_set(roc_auc), 
+                        alpha = 0.1, times = 2000)
+
 # ------------------------------------------------------------------------------
 # Save results
 
-save(rf_res, rf_final_res, tox_test, file = path("rdata", "model.RData"))
+save(tox_rs, rf_int, rf_res, rf_final_int, rf_final_res, tox_test, 
+     file = path("rdata", "model.RData"))

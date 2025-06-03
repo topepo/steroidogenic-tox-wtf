@@ -1,0 +1,12 @@
+project:
+  type: website
+  output-dir: docs
+
+knitr:
+  opts_chunk:
+    echo: true
+    collapse: true
+    comment: "#>"
+    fig.path: "figures/"
+
+fig-format: svg
