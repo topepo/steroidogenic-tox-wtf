@@ -12,4 +12,4 @@ raw_data <-
 # ------------------------------------------------------------------------------
 # Save
 
-save(raw_data, file = path("raw_data", "assay_and_compound_data.RData"))
+save(raw_data, file = path("rdata", "assay_and_compound_data.RData"))
