@@ -19,7 +19,7 @@ load(path("rdata", "assay_and_compound_data.RData"))
 # Counts are about the same
 raw_data |> count(Class)
 
-set.seed(301)
+set.seed(5)
 tox_split <- initial_split(raw_data |> select(-Compound), prop = 8/10)
 tox_train <- training(tox_split)
 tox_test  <- testing(tox_split)
