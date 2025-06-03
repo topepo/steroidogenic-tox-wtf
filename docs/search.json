@@ -1,0 +1,37 @@
+[
+  {
+    "objectID": "index.html",
+    "href": "index.html",
+    "title": "Model Results",
+    "section": "",
+    "text": "The original data consisted of 12 assays on 162 compounds. Each compound was pre-labeled into one of two classes: “toxic” and “nontoxic”.\nThe breakdown of the assays and their class distributions:\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nAssay\nN\ntoxic\nN = 831\nnontoxic\nN = 791\n\n\n\n\nCyp11a1\n162\n1.26 (0.94, 1.77)\n0.78 (0.65, 1.00)\n\n\nCyp11b1\n152\n3 (2, 12)\n1 (1, 2)\n\n\n    Unknown\n\n\n9\n1\n\n\nCyp11b2\n159\n6 (1, 22)\n2 (1, 5)\n\n\n    Unknown\n\n\n3\n0\n\n\nCyp17a1\n162\n1.19 (0.78, 2.13)\n1.03 (0.78, 1.30)\n\n\nCyp19a1\n162\n3.6 (1.5, 8.3)\n1.6 (1.1, 2.4)\n\n\nCyp21a1\n162\n2.8 (1.1, 7.2)\n1.1 (0.8, 1.9)\n\n\nHSD3B2\n161\n1.29 (0.63, 3.24)\n1.02 (0.65, 1.58)\n\n\n    Unknown\n\n\n1\n0\n\n\nStar\n162\n1.58 (0.90, 3.05)\n1.01 (0.73, 1.34)\n\n\nProgesterone\n161\n112 (56, 331)\n95 (62, 194)\n\n\n    Unknown\n\n\n1\n0\n\n\nTestosterone\n162\n78 (52, 104)\n83 (69, 103)\n\n\nDHEA\n162\n82 (60, 111)\n81 (68, 115)\n\n\nCortisol\n151\n91 (45, 116)\n92 (64, 106)\n\n\n    Unknown\n\n\n10\n1\n\n\n\n1 Median (Q1, Q3)\n\n\n\n\n\n\n\n\nNote that 5 assays contained missing values. The patterns of missingness can be shown via an “UpSet” plot:\n\n\n\n\n\n\n\n\n\nThese values will be imputed during the data analysis."
+  },
+  {
+    "objectID": "index.html#data-description",
+    "href": "index.html#data-description",
+    "title": "Model Results",
+    "section": "",
+    "text": "The original data consisted of 12 assays on 162 compounds. Each compound was pre-labeled into one of two classes: “toxic” and “nontoxic”.\nThe breakdown of the assays and their class distributions:\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nAssay\nN\ntoxic\nN = 831\nnontoxic\nN = 791\n\n\n\n\nCyp11a1\n162\n1.26 (0.94, 1.77)\n0.78 (0.65, 1.00)\n\n\nCyp11b1\n152\n3 (2, 12)\n1 (1, 2)\n\n\n    Unknown\n\n\n9\n1\n\n\nCyp11b2\n159\n6 (1, 22)\n2 (1, 5)\n\n\n    Unknown\n\n\n3\n0\n\n\nCyp17a1\n162\n1.19 (0.78, 2.13)\n1.03 (0.78, 1.30)\n\n\nCyp19a1\n162\n3.6 (1.5, 8.3)\n1.6 (1.1, 2.4)\n\n\nCyp21a1\n162\n2.8 (1.1, 7.2)\n1.1 (0.8, 1.9)\n\n\nHSD3B2\n161\n1.29 (0.63, 3.24)\n1.02 (0.65, 1.58)\n\n\n    Unknown\n\n\n1\n0\n\n\nStar\n162\n1.58 (0.90, 3.05)\n1.01 (0.73, 1.34)\n\n\nProgesterone\n161\n112 (56, 331)\n95 (62, 194)\n\n\n    Unknown\n\n\n1\n0\n\n\nTestosterone\n162\n78 (52, 104)\n83 (69, 103)\n\n\nDHEA\n162\n82 (60, 111)\n81 (68, 115)\n\n\nCortisol\n151\n91 (45, 116)\n92 (64, 106)\n\n\n    Unknown\n\n\n10\n1\n\n\n\n1 Median (Q1, Q3)\n\n\n\n\n\n\n\n\nNote that 5 assays contained missing values. The patterns of missingness can be shown via an “UpSet” plot:\n\n\n\n\n\n\n\n\n\nThese values will be imputed during the data analysis."
+  },
+  {
+    "objectID": "index.html#data-splitting",
+    "href": "index.html#data-splitting",
+    "title": "Model Results",
+    "section": "Data Splitting",
+    "text": "Data Splitting\nAn initial split where 80% of the compounds were allocated to the training set (n = 129) and 20% for testing (n = 33). The class frequencies are relatively balanced, so an unstratified split was used.\nTo assess if the training and testing set has approximately the same distribution, we conducted a principal component analysis (PCA) to show how the assays project down to two dimensions. Before conducting PCA, we used a 5-nearest neighbor imputation strategy as well as an Ordered Quantile standardization routine to coerce the assays to a standard scale and also to remove skewness from their distributions. The PCA loadings were computed from the training set, and these values were used to project the training and testing sets.\n\n\n\n\n\n\n\n\n\nThe results show overlapping distributions and no apparent outliers.\nUsing the training set, five repeats of 10-fold cross-validation were created. These will be used to tune our machine learning model."
+  },
+  {
+    "objectID": "index.html#model-tuning",
+    "href": "index.html#model-tuning",
+    "title": "Model Results",
+    "section": "Model Tuning",
+    "text": "Model Tuning\nAn oblique random forest model was used to classify the compounds as “toxic” or “nontoxic”. There are a few tuning parameters to be optimized:\n\nThe number of neighbors used for imputing missing data. Values between 1 and 10 were investigated.\nThe number of assays to use as split candidates, a.k.a \\(m_{try}\\), was marked for optimization. Values from 1 to 12 were used as candidate values.\nThe number of compunds required to make additional splits was also tuned between values of 2 and 40 compounds.\n\nAn Audze-Eglais space-filling design was used to create the grid of 25 parameter candidates.\nFor each candidate, the cross-validated area under the ROC curve was computed and these values are used to determine the final settings for the random forest model. The results are:\n\n\n\n\n\n\n\n\n\nThe left panel shows no trend, indicating that the data did not have a preference for how many neighbors should be used. There was a weak relationship between the AUC and \\(m_{try}\\) and a very strong trend where the smaller the number of compounds required to split, the better the AUC.\nThe numerically best combination was: imputation using seven neighbors, five assays used for splitting, and three compounds require for splitting. Resampling estimates that the area under the ROC should be about 0.853 with a 90% confidence interval of (0.762, 0.885).\nThe final random forest model was fit with these settings using the entire training set. The random forest importance scores for this model were:"
+  },
+  {
+    "objectID": "index.html#test-set-results",
+    "href": "index.html#test-set-results",
+    "title": "Model Results",
+    "section": "Test Set Results",
+    "text": "Test Set Results\nWhen this model was applied to the test set, the confusion matrix was:\n\n\n\n\n\n\n\n\n\n\n\n\n\nPrediction\n\nTrue Values\n\n\n\ntoxic\nnontoxic\n\n\n\n\ntoxic\n12\n3\n\n\nnontoxic\n5\n13\n\n\n\n\n\n\n\nThe test set area under the ROC curve was 0.901 with a 90% confidence interval of (0.807, 0.974). The ROC curve:"
+  }
+]
